@@ -1,0 +1,130 @@
+#!/bin/bash
+# ./vm create templates/ubuntu11
+# ./vm delete id
+# ./vm run id
+# ./vm ssh id
+
+# Fail on error
+set -e
+
+SSH_PRIVATE_KEY="$HOME/.ssh/main_private_key.pem"
+[[ "$CACHE_PATH" ]] || CACHE_PATH="$(pwd)/cache"
+[[ -d "$CACHE_PATH" ]] || mkdir -p $CACHE_PATH
+
+function _fail() {
+    echo "$@"
+    exit
+}
+
+function createCloudImage() {
+    # Validate argument
+    [[ -f "$1" ]] || _fail "Potential templates: $(ls -1 templates)"
+    source "$1"
+
+    #Create vm folder and switch to it
+    VM_PATH="VM$(date +%s)"
+    mkdir "$VM_PATH"
+    cd "$VM_PATH"
+    echo "New image id [$VM_PATH]"
+
+    VMIMG_FILE="$(basename ${VMIMG_URL})"
+
+    # Get the file or use the orig
+    if [ -f "$CACHE_PATH/$VMIMG_FILE" ]; then
+        cp "$CACHE_PATH/$VMIMG_FILE" "$VMIMG_FILE"
+    else
+        curl -LO "$VMIMG_URL"
+        cp "$VMIMG_FILE" "$CACHE_PATH/$VMIMG_FILE"
+    fi
+
+    [[ -z "$DISK_SIZE" ]] || qemu-img resize "$VMIMG_FILE" "$DISK_SIZE"
+
+
+cat << EOF > variables.sh
+IMAGE_FILE=${VMIMG_FILE}
+EOF
+    cd ..
+    echo "Completed. Image [$VM_PATH] built. Run ./vm run $VM_PATH to start it"
+}
+
+function executeCloudImage() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    if [ -f pid ]; then
+        pid=$(<pid)
+        if ps -p $pid 2>&1 > /dev/null; then
+            _fail "This machine is already running. Stop it with ./vm stop $1"
+        fi
+    fi
+    source variables.sh
+
+    sleep 0.5
+    pid="$(ps ax | grep "qemu" | grep "$1" | cut -d ' ' -f 1)"
+    echo "PID: $pid"
+    echo "$pid" > pid
+
+    cd ..
+    echo "VM [$1] running. Use ./vm connect $1 to connect"
+}
+
+function connectMonitor() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    socat -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
+    cd ..
+}
+
+function connectSsh() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    cd "$1"
+    source variables.sh
+    shift
+    ssh -l $SSH_USER -p $SSH_PORT -i $SSH_PRIVATE_KEY -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no localhost $@
+    cd ..
+}
+
+function vmStatus() {
+    [[ -d "$1" ]] || echo "VM [$1] does not exist"
+
+    cd "$1"
+    if [ -f pid ]; then
+        pid=$(<pid)
+        if ps -p $pid 2>&1 > /dev/null; then
+            echo "VM [$1] is stopped"
+        else
+            echo "VM [$1] is running"
+        fi
+    else
+        echo "VM [$1] is stopped"
+    fi
+}
+
+function copyremote() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    cd "$1"
+    source variables.sh
+    shift
+    scp -P $SSH_PORT -i $SSH_PRIVATE_KEY -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no $@ gonzalo@localhost:/home/gonzalo
+    cd ..
+}
+
+
+if [ "$1" == "create" -o "$1" == "new" ]; then
+    createCloudImage "$2"
+elif [ "$1" == "run" ]; then
+    executeCloudImage "$2"
+else
+    cat << EOF
+Usage: ./vm command [arguments]
+
+Commands:
+    create   [template]     Create a new VM based off of a template
+    run      [vm]           Start up a VM
+    monitor  [vm]           Monitor and connect to the VM manager
+    ssh      [vm]           Connect to the VM
+    status   [vm]           Get the state of a VM
+    scp      [vm] [files]   Copy files to home environment on target host
+EOF
+fi
