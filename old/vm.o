@@ -1,0 +1,218 @@
+#!/bin/bash
+# ./vm create templates/ubuntu11
+# ./vm delete id
+# ./vm run id
+# ./vm ssh id
+
+# Fail on error
+set -e
+
+SSH_PRIVATE_KEY="$HOME/.ssh/main_private_key.pem"
+[[ "$CACHE_PATH" ]] || CACHE_PATH="$(pwd)/cache"
+[[ -d "$CACHE_PATH" ]] || mkdir -p $CACHE_PATH
+
+function _fail() {
+    echo "$@"
+    exit
+}
+
+function _bootstrapBios() {
+    [[ "$FLASH_IMG" ]] || export FLASH_IMG="flash0.img"
+    if [ -f "$CACHE_PATH/$FLASH_IMG" ]; then
+        cp "$CACHE_PATH/$FLASH_IMG" "flash0.img"
+    else
+        echo "Downloading EFI image"
+        if [ "flash0.img" = "$FLASH_IMG" ]; then
+            curl -kLO https://releases.linaro.org/components/kernel/uefi-linaro/16.02/release/qemu64/QEMU_EFI.fd
+        else
+            curl -kLO http://snapshots.linaro.org/components/kernel/leg-virt-tianocore-edk2-upstream/4919/QEMU-AARCH64/RELEASE_GCC5/QEMU_EFI.fd
+        fi
+        dd if=/dev/zero of=flash0.img bs=1m count=64 status=none
+        dd if=QEMU_EFI.fd of=flash0.img conv=notrunc status=none
+        rm -f QEMU_EFI.fd
+        cp flash0.img "$CACHE_PATH/$FLASH_IMG"
+    fi
+
+    if [ -f "$CACHE_PATH/flash1.img" ]; then
+        cp "$CACHE_PATH/flash1.img" "flash1.img"
+    else
+        dd if=/dev/zero of=flash1.img bs=1m count=64 status=none
+        cp "flash1.img" "$CACHE_PATH/flash1.img"
+    fi
+}
+
+function _bootstrapCloudImage() {
+    if [ -f "$CACHE_PATH/cloud.img" ]; then
+        cp "$CACHE_PATH/cloud.img" "cloud.img"
+    else
+        # Check that docker is running
+        docker info > /dev/null 2>&1 || _fail "Docker not running. Exiting"
+
+        cat << EOF > cloud.txt
+#cloud-config
+users:
+  - name: $USER
+    ssh-authorized-keys:
+      - $(ssh-keygen -f $SSH_PRIVATE_KEY -y)
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
+EOF
+        cat << EOF > Dockerfile
+FROM ubuntu
+RUN apt update
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cloud-image-utils
+EOF
+
+        echo "Building the cloud starter image"
+        docker rm cloud-image-utils 2>/dev/null || true
+        docker build -t cloud-image-utils .
+        docker run -v $(pwd):/mnt cloud-image-utils cloud-localds -v -d qcow2 /mnt/cloud.img /mnt/cloud.txt
+        docker rm $(docker ps -a -f status=exited -q)
+        docker image rm cloud-image-utils
+        cp cloud.img "$CACHE_PATH/cloud.img"
+    fi
+}
+
+function createFromCloudImage() {
+    # Validate argument
+    [[ -f "$1" ]] || _fail "Potential templates: $(ls -1 templates)"
+    source "$1"
+
+    #Create vm folder and switch to it
+    VM_PATH="VM$(date +%s)"
+    mkdir "$VM_PATH"
+    cd "$VM_PATH"
+    echo "New image id [$VM_PATH]"
+
+    _bootstrapBios
+    _bootstrapCloudImage
+
+    VMIMG_FILE="$(basename ${VMIMG_URL})"
+
+    # Get the file or use the orig
+    if [ -f "$CACHE_PATH/$VMIMG_FILE" ]; then
+        cp "$CACHE_PATH/$VMIMG_FILE" "$VMIMG_FILE"
+    else
+        curl -LO "$VMIMG_URL"
+        cp "$VMIMG_FILE" "$CACHE_PATH/$VMIMG_FILE"
+    fi
+
+    [[ -z "$DISK_SIZE" ]] || qemu-img resize "$VMIMG_FILE" "$DISK_SIZE"
+
+
+cat << EOF > variables.sh
+IMAGE_FILE=${VMIMG_FILE}
+SSH_PORT=$((2222 + $RANDOM % 200))
+SSH_USER=$USER
+SSH_PRIVATE_KEY=$SSH_PRIVATE_KEY
+EOF
+    cd ..
+    echo "Completed. Image [$VM_PATH] built. Run ./vm run $VM_PATH to start it"
+}
+
+function executeCloudImage() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    if [ -f pid ]; then
+        pid=$(<pid)
+        if ps -p $pid 2>&1 > /dev/null; then
+            _fail "This machine is already running. Stop it with ./vm stop $1"
+        fi
+    fi
+    source variables.sh
+    export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+    qemu-system-aarch64 -m 4096 -smp 2 -cpu cortex-a57 -M virt \
+        -name "$1" -display vnc=unix:vnc.socket \
+        -accel hvf -daemonize \
+        -monitor unix:qemu-monitor-socket,server,nowait \
+        -drive if=pflash,file=flash0.img,format=raw \
+        -drive if=pflash,file=flash1.img,format=raw \
+        -drive if=none,file=$IMAGE_FILE,id=hd0 \
+        -device virtio-blk-device,drive=hd0 \
+        -drive if=none,id=cloud,file=cloud.img \
+        -device virtio-blk-device,drive=cloud \
+        -device virtio-net-device,netdev=user0 \
+        -netdev user,id=user0,hostfwd=tcp::$SSH_PORT-:22
+    [[ $? -eq 0 ]] || _fail "The qemu command failed"
+
+    sleep 0.5
+    pid="$(ps ax | grep "qemu" | grep "$1" | cut -d ' ' -f 1)"
+    echo "PID: $pid"
+    echo "$pid" > pid
+
+    cd ..
+    echo "VM [$1] running. Use ./vm connect $1 to connect"
+}
+
+function connectMonitor() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    socat -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
+    cd ..
+}
+
+function connectSsh() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    cd "$1"
+    source variables.sh
+    shift
+    ssh -l $SSH_USER -p $SSH_PORT -i $SSH_PRIVATE_KEY -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no localhost $@
+    cd ..
+}
+
+function vmStatus() {
+    [[ -d "$1" ]] || echo "VM [$1] does not exist"
+
+    cd "$1"
+    if [ -f pid ]; then
+        pid=$(<pid)
+        if ps -p $pid 2>&1 > /dev/null; then
+            echo "VM [$1] is stopped"
+        else
+            echo "VM [$1] is running"
+        fi
+    else
+        echo "VM [$1] is stopped"
+    fi
+}
+
+function copyremote() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    cd "$1"
+    source variables.sh
+    shift
+    scp -P $SSH_PORT -i $SSH_PRIVATE_KEY -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no $@ gonzalo@localhost:/home/gonzalo
+    cd ..
+}
+
+
+if [ "$1" == "create" -o "$1" == "new" ]; then
+    createFromCloudImage "$2"
+elif [ "$1" == "run" ]; then
+    executeCloudImage "$2"
+elif [ "$1" == "monitor" ]; then
+    connectMonitor "$2"
+elif [ "$1" == "ssh" ]; then
+    shift
+    connectSsh $@
+elif [ "$1" == "scp" ]; then
+    shift
+    copyremote $@
+elif [ "$1" == "status" ]; then
+    vmStatus "$2"
+else
+    cat << EOF
+Usage: ./vm command [arguments]
+
+Commands:
+    create   [template]     Create a new VM based off of a template
+    run      [vm]           Start up a VM
+    monitor  [vm]           Monitor and connect to the VM manager
+    ssh      [vm]           Connect to the VM
+    status   [vm]           Get the state of a VM
+    scp      [vm] [files]   Copy files to home environment on target host
+EOF
+fi

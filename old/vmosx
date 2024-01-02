@@ -1,0 +1,69 @@
+#!/bin/bash
+# ./vm create templates/ubuntu11
+# ./vm delete id
+# ./vm run id
+# ./vm ssh id
+
+#!/bin/bash
+
+# Fail on error
+set -e
+
+SSH_PRIVATE_KEY="$HOME/.ssh/main_private_key.pem"
+[[ "$CACHE_PATH" ]] || CACHE_PATH="$(pwd)/cache"
+[[ -d "$CACHE_PATH" ]] || mkdir -p $CACHE_PATH
+((RND=RANDOM<<15|RANDOM))
+
+function _fail() {
+    echo "$@"
+    exit
+}
+
+function _cache_download() {
+    FILENAME_URL="$(basename $1)"
+    [[ -f "$CACHE_PATH/$FILENAME_URL" ]] || (cd $CACHE_PATH; $(which curl) -LkO "$1")
+    cp -c "$CACHE_PATH/$FILENAME_URL" .
+}
+
+function createImage() {
+    VM_PATH="VM${RND:-6}"
+    mkdir "$VM_PATH"
+    source "$1"
+    cd "$VM_PATH"
+    echo "New image id [$VM_PATH]"
+
+    VMIMG_FILE="$(basename ${VMIMG_URL})"
+    _cache_download "$VMIMG_URL"
+
+
+    MACOSVM_URL="https://github.com/s-u/macosvm/releases/download/0.2-1/macosvm-0.2-1-arm64-darwin21.tar.gz"
+    MACOSVM_TARGZ="$(basename $MACOSVM_URL)"
+    _cache_download "$MACOSVM_URL"
+    $(which tar) -xf "$MACOSVM_TARGZ"
+    rm -f "$MACOSVM_TARGZ"
+
+    UNIVERSALMAC_IMG="$(ls -l1t UniversalMac* | head -n 1)"
+    ./macosvm --disk disk.img,size=50g --aux aux.img --restore $UNIVERSALMAC_IMG -c 4 -r 8589934592 vm.json
+}
+
+function executeImage() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    shift 3
+    ./macosvm -g $@ vm.json
+}
+
+if [ "$1" == "create" -o "$1" == "new" ]; then
+    createImage "$2"
+elif [ "$1" == "run" ]; then
+    executeImage "$2" $@
+else
+    cat << EOF
+Usage: ./vm command [arguments]
+
+Commands:
+    create   [template]     Create a new VM based off of a template
+    run      [vm]           Start up a VM
+EOF
+fi
