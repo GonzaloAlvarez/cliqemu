@@ -1,10 +1,13 @@
 #!/bin/bash
 
-. host/common.sh
+MASTER_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+TEMPLATES_DIR="${MASTER_DIR}/templates"
+
+. ${TEMPLATES_DIR}/common.sh
 source_host
 
 
-if [ "$1" == "create" -o "$1" == "new"]; then
+if [ "$1" == "create" -o "$1" == "new" ]; then
     _new_vm "$2"
 elif [ "$1" == "run" ]; then
     _run_vm "$2"
