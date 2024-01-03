@@ -3,8 +3,6 @@
 # Common logic for all linux hosts and architectures
 ##
 
-((RND=RANDOM<<15|RANDOM))
-
 cloudimg="${CACHE_PATH}/seed.img"
 keyfile=GonzaloAlvarez-MasterSSH-pubkey.pem
 keycontent="$(curl -s https://raw.githubusercontent.com/GonzaloAlvarez/credentials/master/SSH/$keyfile)"

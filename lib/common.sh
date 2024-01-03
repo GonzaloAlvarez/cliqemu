@@ -5,7 +5,7 @@
 
 [[ "$CACHE_PATH" ]] || CACHE_PATH="${MASTER_DIR}/.cache"
 [[ -d "$CACHE_PATH" ]] || mkdir -p $CACHE_PATH
-
+((RND=RANDOM<<15|RANDOM))
 
 _isfunction() { declare -F -- "$@" >/dev/null; }
 
@@ -14,16 +14,25 @@ function _fail {
     exit;
 }
 
-function source_host() {
+function source_tree() {
     os="$(uname -s | tr '[:upper:]' '[:lower:]')"
     arch="$(uname -m)"
 
-    if [ -f "${TEMPLATES_DIR}/${os}/common.sh" ]; then
-        source "${TEMPLATES_DIR}/${os}/common.sh"
+    if [ -f "${LIB_PATH}/${os}.sh" ]; then
+        source "${LIB_PATH}/${os}.sh"
     fi
 
-    if [ -f "${TEMPLATES_DIR}/${os}/${arch}/common.sh" ]; then
-        source "${TEMPLATES_DIR}/${os}/${arch}/common.sh"
+    if [ -f "${LIB_PATH}/${os}-${arch}.sh" ]; then
+        source "${LIB_PATH}/${os}-${arch}.sh"
+    fi
+
+    if [ -f "$1" ]; then
+        if [[ $1 == *.vmt ]]; then
+            source "$1"
+            if [ "$target" -a -f "${LIB_PATH}/${os}-${arch}-${target}.sh" ]; then
+                source "${LIB_PATH}/${os}-${arch}-${target}.sh"
+            fi
+        fi
     fi
 
     _isfunction "check_dependencies" && check_dependencies;
