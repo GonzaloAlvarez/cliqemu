@@ -1,0 +1,3 @@
+os_version="23.04"
+iso="ubuntu-${os_version}-server-cloudimg-amd64.img"
+isourl="https://cloud-images.ubuntu.com/releases/${os_version}/release/${iso}"

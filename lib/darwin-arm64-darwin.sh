@@ -1,6 +1,6 @@
 #!/bin/bash
 ##
-# Logic for Darwin ARM64 images
+# Logic for Darwin ARM64 images that deploy with macosvm (darwin)
 ##
 
 function check_dependencies {
