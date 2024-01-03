@@ -34,6 +34,14 @@ function source_tree() {
             fi
         fi
     fi
+    if [ -d "$1" ]; then
+        if [ -f "$1/variables.sh" ]; then
+            source "$1/variables.sh"
+            if [ "$target" -a -f "${LIB_PATH}/${os}-${arch}-${target}.sh" ]; then
+                source "${LIB_PATH}/${os}-${arch}-${target}.sh"
+            fi
+        fi
+    fi
 
     _isfunction "check_dependencies" && check_dependencies;
 }
