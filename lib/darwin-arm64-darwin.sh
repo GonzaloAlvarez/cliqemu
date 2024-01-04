@@ -14,6 +14,7 @@ function check_dependencies {
 }
 
 function _new_vm {
+    [[ -f "$1" ]] || _fail "Potential templates: $(ls -R1 templates)"
     VM_PATH="VM${RND:-6}"
     mkdir "$VM_PATH"
     source "$1"
