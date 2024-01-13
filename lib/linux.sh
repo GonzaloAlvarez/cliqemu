@@ -4,53 +4,13 @@
 ##
 
 cloudimg="${CACHE_PATH}/seed.img"
-keyfile=GonzaloAlvarez-MasterSSH-pubkey.pem
-keycontent="$(curl -s https://raw.githubusercontent.com/GonzaloAlvarez/credentials/master/SSH/$keyfile)"
 
 function __nocloud_setup {
     rm -f "${CACHE_PATH}/user-data"
     rm -f "${CACHE_PATH}/meta-data"
 
-    cat >user-data <<EOF
-#cloud-config
-ssh_pwauth: true
-disable_root: false
-users:
-  - name: ubuntu
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin
-    home: /home/ubuntu
-    shell: /bin/bash
-    lock_passwd: false
-    ssh-authorized-keys:
-      - ${keycontent}
-  - name: gonzalo
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin
-    home: /home/gonzalo
-    shell: /bin/bash
-    lock_passwd: false
-    ssh-authorized-keys:
-      - ${keycontent}
-chpasswd:
-  users:
-    - name: ubuntu
-      password: linux
-      type: text
-    - name: gonzalo
-      password: linux
-      type: text
-  expire: False
-packages:
-  - qemu-guest-agent
-# written to /var/log/cloud-init-output.log
-final_message: "The system is finally up, after \$UPTIME seconds"
-EOF
-
-    cat >meta-data <<EOF
-# meta-data
-hostname: qemu
-EOF
+    __write_userdata
+    __write_metadata
 
     # Generate the user data
     $(which genisoimage) -output seed.iso -volid cidata -joliet -rock "user-data" "meta-data"

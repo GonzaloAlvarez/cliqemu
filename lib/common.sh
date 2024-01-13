@@ -3,9 +3,12 @@
 # Common logic for all hosts and branching sourcing
 ##
 
+LIB_PATH="${MASTER_DIR}/lib"
 [[ "$CACHE_PATH" ]] || CACHE_PATH="${MASTER_DIR}/.cache"
 [[ -d "$CACHE_PATH" ]] || mkdir -p $CACHE_PATH
 ((RND=RANDOM<<15|RANDOM))
+
+source "${LIB_PATH}/cloudinit.sh"
 
 _isfunction() { declare -F -- "$@" >/dev/null; }
 
@@ -47,7 +50,13 @@ function source_tree() {
 }
 
 function _cache_download() {
-    FILENAME_URL="$(basename $1)"
-    [[ -f "$CACHE_PATH/$FILENAME_URL" ]] || (cd $CACHE_PATH; $(which curl) -LkO "$1")
+    filename="$2"
+    [[ -z "$filename" ]] && filename="$(basename $1)"
+    if [ ! -f "$CACHE_PATH/$filename" ]; then
+        pushd $CACHE_PATH
+        $(which curl) -LkO "$1"
+        [[ "$2" ]] && mv "${CACHE_PATH}/$(basename $1)" "${CACHE_PATH}/$2"
+        popd
+    fi
 }
 
