@@ -10,6 +10,9 @@ source_tree "$2"
 
 if [ "$1" == "create" -o "$1" == "new" ]; then
     _new_vm "$2"
+elif [ "$1" == "config" ]; then
+    shift
+    _config_vm $@
 elif [ "$1" == "run" ]; then
     _run_vm "$2"
 elif [ "$1" == "monitor" ]; then

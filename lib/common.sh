@@ -17,6 +17,18 @@ function _fail {
     exit;
 }
 
+function __index {
+    [[ "$2" ]] || return 1
+    local -n my_array=$1 # use -n for a reference to the array
+    for i in "${!my_array[@]}"; do
+    if [[ ${my_array[i]} = $2 ]]; then
+        printf '%s\n' "$i"
+        return
+    fi
+    done
+    return 1
+}
+
 function source_tree() {
     os="$(uname -s | tr '[:upper:]' '[:lower:]')"
     arch="$(uname -m)"
@@ -60,3 +72,24 @@ function _cache_download() {
     fi
 }
 
+__configs=( "disk.size" )
+__configs_description=( "disk.size [SIZE]         Resize disk or increase. See qemu-img resize man page" )
+__configs_functions=( _resize_disk )
+
+function _config_vm() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    cd "$1"
+    source variables.sh
+    shift
+
+    if index=$(__index __configs $1); then
+        shift
+        __configs_functions[$index] $@
+    else
+        echo "configuration key not found. These are the available configuration keys:"
+        echo "Usage: "
+        (IFS=$'\n'; echo "    ${__configs_description[*]}")
+    fi
+
+    cd ..
+}

@@ -53,7 +53,10 @@ function _new_vm {
 IMAGE_FILE=${img}
 SSH_PORT=$((2222 + $RANDOM % 200))
 EOF
+}
 
+function _resize_disk {
+    $(which qemu-img) resize "$IMAGE_FILE" $1
 }
 
 function _run_vm {
