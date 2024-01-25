@@ -74,9 +74,22 @@ function _cache_download() {
     fi
 }
 
+function __generate_sshkey() {
+    $(which ssh-keygen) -q -t rsa -b 4096 -N '' -C "email@qemu.vm" -f sshkey <<< $'\ny' >/dev/null 2>&1
+}
+
+function _ssh_vm() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    cd "$1"
+    source variables.sh
+
+    $(which ssh) -l gonzalo -p $SSH_PORT -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -i sshkey 127.0.0.1
+    cd ..
+}
+
 __configs=( "disk.size" "display.mode" )
-__configs_description=( "disk.size [SIZE]                 Resize disk or increase. See qemu-img resize man page" \
-                        "display.mode [vnc|term|window]   Set the display mode. VNC is default" )
+__configs_description=( "  disk.size [SIZE]                 Resize disk or increase. See qemu-img resize man page" \
+                        "  display.mode [vnc|term|window]   Set the display mode. VNC is default" )
 __configs_functions=( _resize_disk _display_mode )
 
 function _config_vm() {
@@ -91,7 +104,7 @@ function _config_vm() {
     else
         echo "configuration key not found. These are the available configuration keys:"
         echo "Usage: "
-        (IFS=$'\n'; echo "    ${__configs_description[*]}")
+        (IFS=$'\n'; echo "${__configs_description[*]}")
     fi
 
     cd ..

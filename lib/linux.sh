@@ -9,6 +9,7 @@ function __nocloud_setup {
     rm -f "${CACHE_PATH}/user-data"
     rm -f "${CACHE_PATH}/meta-data"
 
+    __generate_sshkey
     __write_userdata
     __write_metadata
 

@@ -3,13 +3,12 @@
 # Cloudinit user data and metadata methods
 ##
 
-keyfile=GonzaloAlvarez-MasterSSH-pubkey.pem
-keycontent="$(curl -s https://raw.githubusercontent.com/GonzaloAlvarez/credentials/master/SSH/$keyfile)"
-
 function __write_userdata {
-        cat >user-data << EOF
+    keycontent="$(<sshkey.pub)"
+    cat >user-data << EOF
 #cloud-config
 disable_root: true
+hostname: qemu
 users:
   - name: gonzalo
     sudo: ALL=(ALL) NOPASSWD:ALL

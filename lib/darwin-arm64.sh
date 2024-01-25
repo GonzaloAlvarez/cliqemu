@@ -23,6 +23,7 @@ function __setup_efi {
 }
 
 function __setup_cloudinit {
+    __generate_sshkey
     __write_userdata
     __write_metadata
 
@@ -62,7 +63,7 @@ function _resize_disk {
 
 function _display_mode {
     if [ "$1" == "vnc" ]; then
-        echo 'display="-display vnc=unix:vnc.socket -nographic -daemonize"' >> variables.sh
+        echo 'display="-display vnc=unix:vnc.socket -daemonize"' >> variables.sh
     elif [ "$1" == "term" ]; then
         echo 'display="-nographic"' >> variables.sh
     elif [ "$1" == "window" ]; then
