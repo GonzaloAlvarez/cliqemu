@@ -52,11 +52,25 @@ function _new_vm {
     cat << EOF > variables.sh
 IMAGE_FILE=${img}
 SSH_PORT=$((2222 + $RANDOM % 200))
+display="-display vnc=unix:vnc.socket -daemonize"
 EOF
 }
 
 function _resize_disk {
     $(which qemu-img) resize "$IMAGE_FILE" $1
+}
+
+function _display_mode {
+    if [ "$1" == "vnc" ]; then
+        echo 'display="-display vnc=unix:vnc.socket -nographic -daemonize"' >> variables.sh
+    elif [ "$1" == "term" ]; then
+        echo 'display="-nographic"' >> variables.sh
+    elif [ "$1" == "window" ]; then
+        echo 'display=""' >> variables.sh
+    else
+        echo "Only vnc, term or window are valid values"
+        return
+    fi
 }
 
 function _run_vm {
@@ -65,9 +79,8 @@ function _run_vm {
     source variables.sh
     shift
     export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-    #-display vnc=unix:vnc.socket -daemonize \
     $(which qemu-system-aarch64) -m 4096 -smp 2 -cpu cortex-a57 -M virt \
-        -name "$1" -nographic \
+        -name "$1" $display \
         -accel hvf \
         -monitor unix:qemu-monitor-socket,server,nowait \
         -drive if=pflash,file=flash0.img,format=raw \

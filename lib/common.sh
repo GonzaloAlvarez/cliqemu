@@ -19,12 +19,14 @@ function _fail {
 
 function __index {
     [[ "$2" ]] || return 1
-    local -n my_array=$1 # use -n for a reference to the array
+    value="$2"
+    array_name="$1[@]"
+    my_array=("${!array_name}")
     for i in "${!my_array[@]}"; do
-    if [[ ${my_array[i]} = $2 ]]; then
-        printf '%s\n' "$i"
-        return
-    fi
+        if [ "${my_array[$i]}" == "$value" ]; then
+            printf '%s\n' "$i"
+            return
+        fi
     done
     return 1
 }
@@ -72,9 +74,10 @@ function _cache_download() {
     fi
 }
 
-__configs=( "disk.size" )
-__configs_description=( "disk.size [SIZE]         Resize disk or increase. See qemu-img resize man page" )
-__configs_functions=( _resize_disk )
+__configs=( "disk.size" "display.mode" )
+__configs_description=( "disk.size [SIZE]                 Resize disk or increase. See qemu-img resize man page" \
+                        "display.mode [vnc|term|window]   Set the display mode. VNC is default" )
+__configs_functions=( _resize_disk _display_mode )
 
 function _config_vm() {
     [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
@@ -84,7 +87,7 @@ function _config_vm() {
 
     if index=$(__index __configs $1); then
         shift
-        __configs_functions[$index] $@
+        ${__configs_functions[$index]} $@
     else
         echo "configuration key not found. These are the available configuration keys:"
         echo "Usage: "
