@@ -10,16 +10,16 @@ function __write_userdata {
 disable_root: true
 hostname: qemu
 users:
-  - name: gonzalo
+  - name: cliuser
     sudo: ALL=(ALL) NOPASSWD:ALL
     groups: users, admin
-    home: /home/gonzalo
+    home: /home/cliuser
     shell: /bin/bash
     ssh-authorized-keys:
       - ${keycontent}
 chpasswd:
   users:
-    - name: gonzalo
+    - name: cliuser
       password: linux
       type: text
   expire: False

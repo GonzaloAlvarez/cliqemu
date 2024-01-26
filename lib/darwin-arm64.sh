@@ -29,7 +29,7 @@ function __setup_cloudinit {
 
     mkdir cloudinit
     mv meta-data user-data cloudinit/
-    hdiutil makehybrid -o cloud.iso -joliet -iso -default-volume-name cidata cloudinit
+    $(which hdiutil) makehybrid -o cloud.iso -joliet -iso -default-volume-name cidata cloudinit
     $(which qemu-img) convert cloud.iso -O qcow2 cloud.qcow2
 }
 
@@ -73,6 +73,25 @@ function _display_mode {
         return
     fi
 }
+
+function _stop_vm {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    echo "quit" | socat unix-connect:qemu-monitor-socket -
+    cd ..
+}
+
+function _ssh_vm {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    source variables.sh
+    shift
+    $(which ssh) -i sshkey -l cliuser -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p $SSH_PORT localhost $@
+    cd ..
+}
+
 
 function _run_vm {
     [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
