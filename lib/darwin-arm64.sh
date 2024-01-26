@@ -29,7 +29,7 @@ function __setup_cloudinit {
 
     mkdir cloudinit
     mv meta-data user-data cloudinit/
-    hdiutil makehybrid -o cloud.iso -joliet -iso -default-volume-name cidata cloudinit
+    $(which hdiutil) makehybrid -o cloud.iso -joliet -iso -default-volume-name cidata cloudinit
     $(which qemu-img) convert cloud.iso -O qcow2 cloud.qcow2
 }
 
@@ -72,6 +72,14 @@ function _display_mode {
         echo "Only vnc, term or window are valid values"
         return
     fi
+}
+
+function _stop_vm {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    echo "quit" | socat unix-connect:qemu-monitor-socket -
+    cd ..
 }
 
 function _run_vm {

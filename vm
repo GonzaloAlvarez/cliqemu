@@ -15,10 +15,15 @@ elif [ "$1" == "config" ]; then
     _config_vm $@
 elif [ "$1" == "run" ]; then
     _run_vm "$2"
+elif [ "$1" == "list" ]; then
+    _list_vms
+elif [ "$1" == "stop" ]; then
+    _stop_vm "$2"
 elif [ "$1" == "monitor" ]; then
     _monitor_vm "$2"
 elif [ "$1" == "connect" -o "$1" == "ssh" ]; then
-    _ssh_vm "$2"
+    shift
+    _ssh_vm $@
 elif [ "$1" == "status" ]; then
     _status_vm "$2"
 else
@@ -31,5 +36,6 @@ Commands:
     monitor  [vm]           Monitor and connect to the VM manager
     ssh      [vm]           Connect to the VM
     status   [vm]           Get the state of a VM
+    list                    Gets a list of all VMs
 EOF
 fi

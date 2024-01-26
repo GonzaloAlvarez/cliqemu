@@ -83,7 +83,7 @@ function _ssh_vm() {
     cd "$1"
     source variables.sh
 
-    $(which ssh) -l gonzalo -p $SSH_PORT -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -i sshkey 127.0.0.1
+    $(which ssh) -i sshkey -l cliuser -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p $SSH_PORT localhost $@
     cd ..
 }
 
@@ -108,4 +108,17 @@ function _config_vm() {
     fi
 
     cd ..
+}
+
+function _monitor_vm {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+
+    cd "$1"
+    socat -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
+    cd ..
+}
+
+function _list_vms {
+    ls -1 VM* 2>/dev/null
+    [[ $? -ne 0 ]] && echo "No machines found or permissions issue"
 }
