@@ -37,7 +37,7 @@ function _new_vm {
     [[ -f "$1" ]] || _fail "Potential templates: $(ls -R1 templates)"
     VM_PATH="VM${RND:-6}"
     mkdir "$VM_PATH"
-    source "$1"
+    __load_template "$1" "$VM_PATH"
     cd "$VM_PATH"
     echo "New image id [$VM_PATH]"
 
@@ -53,12 +53,36 @@ function _new_vm {
     cat << EOF > variables.sh
 IMAGE_FILE=${img}
 SSH_PORT=$((2222 + $RANDOM % 200))
+baseimage="${vmimg}"
 display="-display vnc=unix:vnc.socket -daemonize"
 EOF
 }
 
 function _resize_disk {
     $(which qemu-img) resize "$IMAGE_FILE" $1
+}
+
+function _new_snapshot {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    cd "$1"
+    source variables.sh
+    SN_PATH="VMSN${RND:-4}"
+    mkdir -p "../$SN_PATH"
+    cp ${IMAGE_FILE} "../$SN_PATH"
+    cp $baseimage "../$SN_PATH"
+    local image_name="$(basename ${IMAGE_FILE})"
+    local base_image_name="$(basename ${baseimage})"
+    tar -cf "../$SN_PATH/extras.tar" sshkey sshkey.pub
+    cd ../$SN_PATH
+    cat <<EOF >variables.sh
+isourl="${base_image_name}"
+EOF
+    $(which qemu-img) rebase -b $base_image_name $image_name -f qcow2 -F qcow2
+    $(which qemu-img) commit $image_name
+    rm -f $image_name
+    tar -cf "../${SN_PATH}.vmsn" *
+    cd ..
+    rm -Rf $SN_PATH
 }
 
 function _display_mode {

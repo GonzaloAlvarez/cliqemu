@@ -75,13 +75,16 @@ function _cache_download() {
 }
 
 function __generate_sshkey() {
-    $(which ssh-keygen) -q -t rsa -b 4096 -N '' -C "email@qemu.vm" -f sshkey <<< $'\ny' >/dev/null 2>&1
+    if [ ! -f "sshkey" ]; then
+        $(which ssh-keygen) -q -t rsa -b 4096 -N '' -C "email@qemu.vm" -f sshkey <<< $'\ny' >/dev/null 2>&1
+    fi
 }
 
 function _ssh_vm() {
     [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
     cd "$1"
     source variables.sh
+    shift
 
     $(which ssh) -i sshkey -l cliuser -o LogLevel=ERROR -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p $SSH_PORT localhost $@
     cd ..
@@ -114,11 +117,25 @@ function _monitor_vm {
     [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
 
     cd "$1"
-    socat -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
+    $(which socat) -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
     cd ..
 }
 
 function _list_vms {
     ls -1 VM* 2>/dev/null
     [[ $? -ne 0 ]] && echo "No machines found or permissions issue"
+}
+
+function __load_template {
+    if [[ $(file -b --mime-type "$1") == 'text/plain'* ]]; then
+        source $1
+    elif [[ $(file -b --mime-type "$1") == 'application/x-bzip2'* ]]; then
+        local template_name="$(basename "$1" | cut -d. -f1)"
+        mkdir -p "$CACHE_PATH/$template_name"
+        $(which tar) -xjf $1 -C "$CACHE_PATH/$template_name"
+        source "$CACHE_PATH/$template_name/variables.sh"
+        mv "$CACHE_PATH/$template_name/$isourl" "$CACHE_PATH"
+        tar -xf "$CACHE_PATH/$template_name/extras.tar" -C "$2"
+        mv "$CACHE_PATH/$template_name/sshkey" "$CACHE_PATH/$template_name/sshkey.pub" "$2"
+    fi
 }
