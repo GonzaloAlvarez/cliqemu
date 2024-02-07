@@ -23,6 +23,8 @@ elif [ "$1" == "stop" ]; then
     _stop_vm "$2"
 elif [ "$1" == "monitor" ]; then
     _monitor_vm "$2"
+elif [ "$1" == "copy" -o "$1" == "cp" -o "$1" == "scp" ]; then
+    _scp_vm "$2" "$3" "$4"
 elif [ "$1" == "connect" -o "$1" == "ssh" ]; then
     shift
     _ssh_vm $@

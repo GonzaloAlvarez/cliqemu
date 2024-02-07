@@ -90,6 +90,25 @@ function _ssh_vm() {
     cd ..
 }
 
+function _scp_vm() {
+    [[ -d "$1" ]] || _fail "That's not an available VM number. Use ./vm list"
+    local file=""
+    local folder=""
+    [[ -f "$2" ]] && file="$(cd "$(dirname -- "$2")" >/dev/null; pwd -P)/$(basename -- "$2")"
+    [[ -d "$3" ]] && folder="$(cd $3 >/dev/null;pwd -P)"
+    cd "$1"
+    source variables.sh
+    shift
+
+    if [ -f "$file" -a -z "$2" ]; then
+        $(which scp) -i sshkey -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -P $SSH_PORT "$file" cliuser@localhost:
+    elif [ -d "$folder" -a -n "$1" ]; then
+        $(which scp) -i sshkey -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -P $SSH_PORT cliuser@localhost:$1 "$folder"
+    else
+        _fail "That combination does not work"
+    fi
+}
+
 __configs=( "disk.size" "display.mode" )
 __configs_description=( "  disk.size [SIZE]                 Resize disk or increase. See qemu-img resize man page" \
                         "  display.mode [vnc|term|window]   Set the display mode. VNC is default" )
