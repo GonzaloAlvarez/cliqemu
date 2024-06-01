@@ -156,5 +156,13 @@ function __load_template {
         mv "$CACHE_PATH/$template_name/$isourl" "$CACHE_PATH"
         tar -xf "$CACHE_PATH/$template_name/extras.tar" -C "$2"
         mv "$CACHE_PATH/$template_name/sshkey" "$CACHE_PATH/$template_name/sshkey.pub" "$2"
+    elif [[ $(file -b --mime-type "$1") == 'application/x-tar'* ]]; then
+        local template_name="$(basename "$1" | cut -d. -f1)"
+        mkdir -p "$CACHE_PATH/$template_name"
+        $(which tar) -xf $1 -C "$CACHE_PATH/$template_name"
+        source "$CACHE_PATH/$template_name/variables.sh"
+        mv "$CACHE_PATH/$template_name/$isourl" "$CACHE_PATH"
+        tar -xf "$CACHE_PATH/$template_name/extras.tar" -C "$2"
+        mv "$CACHE_PATH/$template_name/sshkey" "$CACHE_PATH/$template_name/sshkey.pub" "$2"
     fi
 }

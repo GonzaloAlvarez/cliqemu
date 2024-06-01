@@ -67,6 +67,7 @@ function _new_snapshot {
     cd "$1"
     source variables.sh
     SN_PATH="VMSN${RND:-4}"
+
     mkdir -p "../$SN_PATH"
     cp ${IMAGE_FILE} "../$SN_PATH"
     cp $baseimage "../$SN_PATH"
@@ -77,9 +78,12 @@ function _new_snapshot {
     cat <<EOF >variables.sh
 isourl="${base_image_name}"
 EOF
-    $(which qemu-img) rebase -b $base_image_name $image_name -f qcow2 -F qcow2
-    $(which qemu-img) commit $image_name
-    rm -f $image_name
+    echo "Converting and compressing image"
+    mv "${base_image_name}" "${base_image_name}.large"
+    $(which qemu-img) rebase -b "${base_image_name}.large" ${image_name} -f qcow2 -F qcow2
+    $(which qemu-img) commit "${image_name}"
+    $(which qemu-img) convert -c -p -O qcow2 "${base_image_name}.large" "$base_image_name"
+    rm -f $image_name "${base_image_name}.large"
     tar -cf "../${SN_PATH}.vmsn" *
     cd ..
     rm -Rf $SN_PATH
