@@ -29,12 +29,3 @@ packages:
 final_message: "The system is finally up, after \$UPTIME seconds"
 EOF
 }
-
-function __write_metadata {
-    cat >meta-data <<EOF
-# meta-data
-hostname: qemu
-EOF
-}
-
-

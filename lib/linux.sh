@@ -11,10 +11,9 @@ function __nocloud_setup {
 
     __generate_sshkey
     __write_userdata
-    __write_metadata
 
     # Generate the user data
-    $(which genisoimage) -output seed.iso -volid cidata -joliet -rock "user-data" "meta-data"
+    $(which genisoimage) -output seed.iso -volid cidata -joliet -rock "user-data"
 }
 
 function _new_vm {

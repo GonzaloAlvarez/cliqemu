@@ -25,10 +25,9 @@ function __setup_efi {
 function __setup_cloudinit {
     __generate_sshkey
     __write_userdata
-    __write_metadata
 
     mkdir cloudinit
-    mv meta-data user-data cloudinit/
+    mv user-data cloudinit/
     $(which hdiutil) makehybrid -o cloud.iso -joliet -iso -default-volume-name cidata cloudinit
     $(which qemu-img) convert cloud.iso -O qcow2 cloud.qcow2
 }
